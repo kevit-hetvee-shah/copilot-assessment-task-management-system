@@ -1,44 +1,48 @@
-/** Color-coded badge for task priority and status values. */
+/** Color-coded pill badges for task priority and status. */
 import React from 'react'
 import type { TaskPriority, TaskStatus } from '../types/task'
 
-interface BadgeProps {
-  type: 'priority' | 'status'
-  value: TaskPriority | TaskStatus
+interface PriorityBadgeProps {
+  /** The priority value to display */
+  priority: TaskPriority
 }
 
-const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  high: 'var(--color-priority-high)',
-  medium: 'var(--color-priority-medium)',
-  low: 'var(--color-priority-low)',
+interface StatusBadgeProps {
+  /** The status value to display */
+  status: TaskStatus
 }
 
-const STATUS_COLORS: Record<TaskStatus, string> = {
-  todo: 'var(--color-status-todo)',
-  'in-progress': 'var(--color-status-in-progress)',
-  done: 'var(--color-status-done)',
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
 }
 
-export function Badge({ type, value }: BadgeProps): React.ReactElement {
-  const color = type === 'priority'
-    ? PRIORITY_COLORS[value as TaskPriority]
-    : STATUS_COLORS[value as TaskStatus]
+const STATUS_LABELS: Record<TaskStatus, string> = {
+  todo: 'To Do',
+  'in-progress': 'In Progress',
+  done: 'Done',
+}
 
+/**
+ * Renders a color-coded pill badge for task priority.
+ */
+export function PriorityBadge({ priority }: PriorityBadgeProps): React.ReactElement {
   return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '2px 8px',
-        borderRadius: '12px',
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        color: '#fff',
-        backgroundColor: color,
-        textTransform: 'capitalize',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {value}
+    <span className={`badge badge--${priority}`}>
+      {PRIORITY_LABELS[priority]}
+    </span>
+  )
+}
+
+/**
+ * Renders a color-coded pill badge with a status dot indicator.
+ */
+export function StatusBadge({ status }: StatusBadgeProps): React.ReactElement {
+  return (
+    <span className={`badge badge--${status}`}>
+      <span className="badge__dot" aria-hidden="true" />
+      {STATUS_LABELS[status]}
     </span>
   )
 }

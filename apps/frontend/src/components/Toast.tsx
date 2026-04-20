@@ -1,45 +1,68 @@
-/** Toast notification component for success / error messages. */
+/** Stacking toast notifications with auto-dismiss and progress bar. */
 import React, { useEffect } from 'react'
 
-interface ToastProps {
+export type ToastType = 'success' | 'error' | 'info'
+
+export interface ToastItem {
+  id: string
   message: string
-  type?: 'success' | 'error'
-  onClose: () => void
-  duration?: number
+  type: ToastType
 }
 
-export function Toast({ message, type = 'error', onClose, duration = 4000 }: ToastProps): React.ReactElement {
-  useEffect(() => {
-    const timer = setTimeout(onClose, duration)
-    return () => clearTimeout(timer)
-  }, [onClose, duration])
+interface ToastProps {
+  toast: ToastItem
+  onClose: (id: string) => void
+}
 
-  const bg = type === 'success' ? '#28a745' : '#dc3545'
+interface ToastContainerProps {
+  toasts: ToastItem[]
+  onClose: (id: string) => void
+}
+
+const ICONS: Record<ToastType, string> = {
+  success: '✓',
+  error: '✕',
+  info: 'i',
+}
+
+/**
+ * Single toast notification. Auto-dismisses after 4 seconds with an
+ * animated progress bar. Can also be manually dismissed.
+ */
+function Toast({ toast, onClose }: ToastProps): React.ReactElement {
+  useEffect(() => {
+    const t = setTimeout(() => onClose(toast.id), 4000)
+    return () => clearTimeout(t)
+  }, [toast.id, onClose])
 
   return (
-    <div
-      role="alert"
-      style={{
-        position: 'fixed',
-        bottom: '1.5rem',
-        right: '1.5rem',
-        padding: '0.75rem 1.25rem',
-        borderRadius: '6px',
-        color: '#fff',
-        backgroundColor: bg,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        zIndex: 9999,
-        maxWidth: '360px',
-      }}
-    >
-      {message}
-      <button
-        onClick={onClose}
-        style={{ marginLeft: '1rem', background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
-        aria-label="Close notification"
-      >
-        ✕
-      </button>
+    <div className={`toast toast--${toast.type}`} role="alert" aria-live="polite">
+      <div className="toast__inner">
+        <span className="toast__icon" aria-hidden="true">{ICONS[toast.type]}</span>
+        <p className="toast__message">{toast.message}</p>
+        <button
+          className="toast__close"
+          onClick={() => onClose(toast.id)}
+          aria-label="Dismiss notification"
+        >
+          ×
+        </button>
+      </div>
+      <div className="toast__progress" aria-hidden="true" />
+    </div>
+  )
+}
+
+/**
+ * Container that renders a stack of toast notifications in the bottom-right corner.
+ */
+export function ToastContainer({ toasts, onClose }: ToastContainerProps): React.ReactElement | null {
+  if (toasts.length === 0) return null
+  return (
+    <div className="toast-container" aria-label="Notifications">
+      {toasts.map((t) => (
+        <Toast key={t.id} toast={t} onClose={onClose} />
+      ))}
     </div>
   )
 }

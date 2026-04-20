@@ -1,6 +1,9 @@
 # SQLAlchemy ORM model for the Task entity.
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import Column, DateTime, Enum, String, Text
 from sqlalchemy.orm import DeclarativeBase
@@ -19,7 +22,7 @@ class TaskModel(Base):
 
     id: str = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     title: str = Column(String(200), nullable=False)
-    description: str | None = Column(Text, nullable=True)
+    description: Optional[str] = Column(Text, nullable=True)
     status: str = Column(
         Enum(TaskStatus, values_callable=lambda e: [m.value for m in e]),
         nullable=False,

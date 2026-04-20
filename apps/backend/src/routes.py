@@ -36,39 +36,114 @@ async def list_tasks(
     status: Optional[TaskStatus] = Query(None, description="Filter by task status"),
     priority: Optional[TaskPriority] = Query(None, description="Filter by task priority"),
 ):
-    return JSONResponse(TaskService.get_tasks(status, priority))
+    """GET /api/tasks — returns a list of tasks, optionally filtered by status and priority.
+
+    Args:
+        status: Optional task status filter (todo | in-progress | done).
+        priority: Optional task priority filter (low | medium | high).
+
+    Returns:
+        APIResponse: Envelope containing a list of matching TaskOut objects.
+    """
+    tasks = task_service.list(status=status, priority=priority)
+    return JSONResponse({"success": True, "data": [t.model_dump(mode="json") for t in tasks]})
 
 @router.post("", response_model=APIResponse, status_code=status.HTTP_201_CREATED, summary="Create a task")
 async def create_task(payload: TaskCreate):
-    """POST /api/tasks — creates and returns a new task."""
-    return JSONResponse(TaskService.create(payload=payload))
+    """POST /api/tasks — creates and returns a new task.
+
+    Args:
+        payload: Task creation request containing title, description, status, and priority.
+
+    Returns:
+        APIResponse: Envelope containing the newly created TaskOut object.
+
+    Raises:
+        HTTPException: 400 if title is empty or missing.
+        HTTPException: 422 if status or priority value is invalid.
+    """
+    task = task_service.create(payload=payload)
+    return JSONResponse({"success": True, "data": task.model_dump(mode="json")}, status_code=201)
 
 
 @router.get("/stats", response_model=APIResponse, summary="Task statistics")
 async def task_stats():
-    """GET /api/tasks/stats — counts grouped by status and priority."""
-    return JSONResponse(TaskService.get_stats())
+    """GET /api/tasks/stats — counts grouped by status and priority.
+
+    Returns:
+        APIResponse: Envelope containing a dict with total, by_status, and by_priority counts.
+    """
+    stats = task_service.get_stats()
+    return JSONResponse({"success": True, "data": stats})
 
 
 @router.get("/{task_id}", response_model=APIResponse, summary="Get a task")
 async def get_task(task_id: UUID):
-    """GET /api/tasks/:id — returns a single task by ID."""
-    return JSONResponse(TaskService.get_by_id(task_id))
+    """GET /api/tasks/:id — returns a single task by ID.
+
+    Args:
+        task_id: UUID of the task to retrieve.
+
+    Returns:
+        APIResponse: Envelope containing the matching TaskOut object.
+
+    Raises:
+        HTTPException: 404 if no task with the given ID exists.
+    """
+    task = task_service.get_by_id(task_id)
+    return JSONResponse({"success": True, "data": task.model_dump(mode="json")})
 
 
 @router.put("/{task_id}", response_model=APIResponse, summary="Update a task")
 async def update_task(task_id: UUID, payload: TaskUpdate):
-    """PUT /api/tasks/:id — updates and returns the task."""
-    return JSONResponse(TaskService.update(task_id, payload))
+    """PUT /api/tasks/:id — updates and returns the task.
+
+    Args:
+        task_id: UUID of the task to update.
+        payload: Partial update payload; only provided fields are changed.
+
+    Returns:
+        APIResponse: Envelope containing the updated TaskOut object.
+
+    Raises:
+        HTTPException: 404 if no task with the given ID exists.
+        HTTPException: 422 if an invalid status or priority value is provided.
+    """
+    task = task_service.update(task_id, payload)
+    return JSONResponse({"success": True, "data": task.model_dump(mode="json")})
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a task")
 async def delete_task(task_id: UUID):
-    """DELETE /api/tasks/:id — removes the task."""
-    return TaskService.delete(task_id)
+    """DELETE /api/tasks/:id — removes the task.
+
+    Args:
+        task_id: UUID of the task to delete.
+
+    Returns:
+        None: 204 No Content on success.
+
+    Raises:
+        HTTPException: 404 if no task with the given ID exists.
+    """
+    task_service.delete(task_id)
 
 
 @router.post("/{task_id}/complete", response_model=APIResponse, summary="Complete a task")
 async def complete_task(task_id: UUID):
-    """POST /api/tasks/:id/complete — advances the task status workflow."""
-    return JSONResponse(TaskService.complete(task_id))
+    """POST /api/tasks/:id/complete — advances the task status workflow.
+
+    Transitions: todo → in-progress → done. Raises 422 if already done.
+
+    Args:
+        task_id: UUID of the task to advance.
+
+    Returns:
+        APIResponse: Envelope containing the updated TaskOut object with the new status.
+
+    Raises:
+        HTTPException: 404 if no task with the given ID exists.
+        HTTPException: 422 if the task is already in the 'done' state.
+    """
+    task = task_service.complete(task_id)
+    return JSONResponse({"success": True, "data": task.model_dump(mode="json")})

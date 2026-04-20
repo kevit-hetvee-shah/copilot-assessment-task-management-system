@@ -2,8 +2,11 @@
 Application configuration using Pydantic BaseSettings.
 All environment variables are loaded from a .env file or the environment.
 """
+from __future__ import annotations
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from typing import List
 
 # Root of the monorepo (three levels up from this file)
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -20,7 +23,7 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
     # Persistence — JSON (legacy) & SQLite
     DB_FILE_PATH: Path = ROOT_DIR / "data" / "tasks.json"

@@ -1,8 +1,10 @@
 # Business logic for the Task domain.
 # All CRUD operations and status-workflow enforcement live here.
 # Raw DB access is fully delegated to TaskRepository in libs/utils/database.py.
+from __future__ import annotations
+
 import uuid
-from typing import Optional
+from typing import Optional, Dict
 
 from fastapi import HTTPException, status
 
@@ -11,7 +13,7 @@ from src.dto import TaskCreate, TaskOut, TaskPriority, TaskStatus, TaskUpdate
 from src.models import TaskModel
 
 # Status transition map — defines the only legal forward move for each status
-_NEXT_STATUS: dict[TaskStatus, TaskStatus] = {
+_NEXT_STATUS: Dict[TaskStatus, TaskStatus] = {
     TaskStatus.todo: TaskStatus.in_progress,
     TaskStatus.in_progress: TaskStatus.done,
 }

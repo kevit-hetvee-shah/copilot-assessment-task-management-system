@@ -71,19 +71,24 @@ A full-stack task management application built with **FastAPI** (backend) and **
 
 - Python 3.11+
 - Node.js 20+
+- npm 9+
 - (Optional) A virtual environment tool such as `venv`
+
+> ⚠️ **Run the backend first**, then the frontend. The frontend dev server proxies all `/api/*` requests to the backend on port **8000**.
 
 ### 1 — Clone & configure environment
 
 ```bash
 git clone <repo-url>
-cd copilot_assesment
+cd copilot-assessment-task-management-system
 cp .env.example .env   # edit if you need custom paths / ports
 ```
 
-### 2 — Backend
+### 2 — Backend (FastAPI · port 8000)
 
 ```bash
+# From the repo root
+
 # Create and activate a virtual environment (recommended)
 python -m venv .venv && source .venv/bin/activate
 
@@ -95,17 +100,36 @@ cd apps/backend
 PYTHONPATH=../../ uvicorn main:app --reload --port 8000
 ```
 
-API docs are available at <http://localhost:8000/docs>
+The backend will be available at:
 
-### 3 — Frontend
+| URL | Description |
+|-----|-------------|
+| <http://localhost:8000> | Base API |
+| <http://localhost:8000/docs> | Interactive Swagger UI |
+| <http://localhost:8000/redoc> | ReDoc documentation |
+
+### 3 — Frontend (React + Vite · port 5174)
+
+Open a **new terminal**, then:
 
 ```bash
+# From the repo root
 cd apps/frontend
 npm install
-npm run dev          # Vite dev server on http://localhost:5173
+npm run dev          # Vite dev server starts on http://localhost:5174
 ```
 
-The Vite dev server proxies `/api/*` to the FastAPI backend automatically.
+The frontend will be available at **<http://localhost:5174>**.
+
+The Vite dev server automatically proxies all `/api/*` requests to `http://localhost:8000`, so no manual CORS configuration is needed during development.
+
+### Quick-start summary
+
+| Service | URL | Notes |
+|---------|-----|-------|
+| **Backend API** | <http://localhost:8000> | FastAPI + Uvicorn |
+| **API Docs (Swagger)** | <http://localhost:8000/docs> | Interactive API explorer |
+| **Frontend App** | <http://localhost:5174> | React + Vite dev server |
 
 ---
 
@@ -149,7 +173,7 @@ npm test
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `development` | `development` or `production` |
-| `CORS_ORIGINS` | `["http://localhost:5173"]` | Allowed CORS origins (JSON list) |
+| `CORS_ORIGINS` | `["http://localhost:5174"]` | Allowed CORS origins (JSON list) |
 | `DB_FILE_PATH` | `data/tasks.json` | Path to the JSON datastore |
 
 ---

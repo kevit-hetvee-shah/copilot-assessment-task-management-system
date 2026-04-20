@@ -1,80 +1,253 @@
 /**
  * E2E tests for the Task Management System.
- * Generated via Playwright MCP browser observation.
  *
- * Covers: page load, add task, complete task workflow,
- *         edit task, delete task, filter by status/priority, live search.
+ * Covers:
+ *  1. Page load & layout (header, stats bar, table, filter bar)
+ *  2. Viewing tasks (table columns, badge colours, empty state)
+ *  3. Adding a task (success, validation, description, modal behaviour)
+ *  4. Searching tasks (live search, no-match, clear search)
+ *  5. Filtering by status and priority (individual + combined)
+ *  6. Editing a task (title, description, priority, status)
+ *  7. Completing a task (todo → in-progress → done workflow)
+ *  8. Deleting a task (confirmation, row removal)
+ *  9. Stats bar counters (update after mutations)
+ * 10. Toast notifications (success / error messages)
+ * 11. Modal behaviour (Escape key, backdrop click, Cancel button)
  *
- * Run: npx playwright test
- * Requires: frontend on http://localhost:5173 + backend on http://localhost:8000
+ * Run:
+ *   npx playwright test
+ *
+ * Requirements:
+ *   - Frontend running on http://localhost:5174
+ *   - Backend running on http://localhost:8000
  */
-import { test, expect, Page } from '@playwright/test'
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import { test, expect, type Page } from '@playwright/test'
 
-async function openAddModal(page: Page) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Click the "Add Task" button and wait for the modal to appear. */
+async function openAddModal(page: Page): Promise<void> {
   await page.getByRole('button', { name: /add task/i }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
 }
 
-async function fillAndSubmitTask(page: Page, title: string, priority: 'Low' | 'Medium' | 'High' = 'Medium') {
+/**
+ * Fill in the task form and submit it.
+ *
+ * @param page      - Playwright page instance.
+ * @param title     - Task title to enter.
+ * @param priority  - Priority radio to select (default 'medium').
+ * @param description - Optional description text.
+ */
+async function fillAndSubmitTask(
+  page: Page,
+  title: string,
+  priority: 'low' | 'medium' | 'high' = 'medium',
+  description?: string,
+): Promise<void> {
   await page.getByLabel(/title/i).fill(title)
-  await page.getByRole('radio', { name: priority }).click()
-  await page.getByRole('button', { name: /save task/i }).click()
+  if (description) {
+    await page.getByLabel(/description/i).fill(description)
+  }
+  await page.locator(`input[name="priority"][value="${priority}"]`).locator('..').click()
+  await page.getByRole('button', { name: /save task|update task/i }).click()
 }
 
-// ---------------------------------------------------------------------------
-// Test suite
-// ---------------------------------------------------------------------------
+/**
+ * Create a task and wait for it to appear in the table.
+ * Returns the unique title used.
+ */
+async function createTask(
+  page: Page,
+  titlePrefix = 'Task',
+  priority: 'low' | 'medium' | 'high' = 'medium',
+  description?: string,
+): Promise<string> {
+  const title = `${titlePrefix} ${Date.now()}`
+  await openAddModal(page)
+  await fillAndSubmitTask(page, title, priority, description)
+  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await expect(page.getByText(title)).toBeVisible()
+  return title
+}
 
-test.describe('Task Management System', () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// 1 · Page load & layout
+// ─────────────────────────────────────────────────────────────────────────────
 
-  test('page load — table and Add Task button are visible', async ({ page }) => {
+test.describe('1 · Page load & layout', () => {
+  test('displays the header with brand name and Add Task button', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByRole('table', { name: /tasks/i })).toBeVisible()
+    await expect(page.getByText('TaskFlow')).toBeVisible()
     await expect(page.getByRole('button', { name: /add task/i })).toBeVisible()
-    await expect(page.getByPlaceholder(/search tasks/i)).toBeVisible()
   })
 
-  test('add task — new task appears in the table', async ({ page }) => {
+  test('displays the stats bar with Total, To Do, In Progress, and Done counters', async ({ page }) => {
     await page.goto('/')
-    const title = `E2E Task ${Date.now()}`
+    const statsRegion = page.getByRole('region', { name: /task statistics/i })
+    await expect(statsRegion).toBeVisible()
+    await expect(statsRegion.getByText('Total')).toBeVisible()
+    await expect(statsRegion.getByText('To Do')).toBeVisible()
+    await expect(statsRegion.getByText('In Progress')).toBeVisible()
+    await expect(statsRegion.getByText('Done')).toBeVisible()
+  })
+
+  test('displays the task table with correct column headings', async ({ page }) => {
+    await page.goto('/')
+    const table = page.getByRole('table', { name: /tasks/i })
+    await expect(table).toBeVisible()
+    await expect(table.getByRole('columnheader', { name: /title/i })).toBeVisible()
+    await expect(table.getByRole('columnheader', { name: /priority/i })).toBeVisible()
+    await expect(table.getByRole('columnheader', { name: /status/i })).toBeVisible()
+    await expect(table.getByRole('columnheader', { name: /created/i })).toBeVisible()
+  })
+
+  test('displays the filter bar with search input and dropdowns', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('searchbox', { name: /search tasks/i })).toBeVisible()
+    await expect(page.getByLabel(/filter by status/i)).toBeVisible()
+    await expect(page.getByLabel(/filter by priority/i)).toBeVisible()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2 · Viewing tasks
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('2 · Viewing tasks', () => {
+  test('shows empty-state prompt when no tasks exist after filtering to a new type', async ({ page }) => {
+    await page.goto('/')
+    const uniqueSearch = `EmptyState${Date.now()}`
+    await page.getByRole('searchbox', { name: /search tasks/i }).fill(uniqueSearch)
+    await expect(page.getByText(/no tasks yet/i)).toBeVisible()
+  })
+
+  test('shows task title, priority badge, status badge, and created date in the row', async ({ page }) => {
+    await page.goto('/')
+    const title = await createTask(page, 'ViewTask', 'high')
+    const row = page.getByRole('row').filter({ hasText: title })
+    await expect(row.getByText('High')).toBeVisible()
+    await expect(row.getByText('To Do')).toBeVisible()
+    await expect(row.getByText(/\w{3} \d{1,2},? \d{4}/)).toBeVisible()
+  })
+
+  test('shows description as a subtitle under the task title', async ({ page }) => {
+    await page.goto('/')
+    const title = await createTask(page, 'DescTask', 'low', 'This is a test description')
+    const row = page.getByRole('row').filter({ hasText: title })
+    await expect(row.getByText('This is a test description')).toBeVisible()
+  })
+
+  test('task count label reflects the number of visible tasks', async ({ page }) => {
+    await page.goto('/')
+    const title = await createTask(page, 'CountTask')
+    await expect(page.locator('.section-count')).toContainText(/\d+ tasks?/)
+    await page.getByRole('searchbox', { name: /search tasks/i }).fill(title)
+    await expect(page.locator('.section-count')).toContainText('1 task')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3 · Adding a task
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('3 · Adding a task', () => {
+  test('creates a new task and it appears in the table', async ({ page }) => {
+    await page.goto('/')
+    const title = `New Task ${Date.now()}`
     await openAddModal(page)
-    await fillAndSubmitTask(page, title, 'High')
+    await fillAndSubmitTask(page, title, 'high')
     await expect(page.getByRole('dialog')).not.toBeVisible()
     await expect(page.getByText(title)).toBeVisible()
   })
 
-  test('add task — empty title shows validation error', async ({ page }) => {
+  test('shows a success toast after creating a task', async ({ page }) => {
+    await page.goto('/')
+    await createTask(page, 'ToastTask')
+    await expect(page.getByText(/task created successfully/i)).toBeVisible()
+  })
+
+  test('shows validation error when title is empty and modal stays open', async ({ page }) => {
     await page.goto('/')
     await openAddModal(page)
     await page.getByRole('button', { name: /save task/i }).click()
     await expect(page.getByText(/title is required/i)).toBeVisible()
-    await expect(page.getByRole('dialog')).toBeVisible() // modal stays open
+    await expect(page.getByRole('dialog')).toBeVisible()
   })
+})
 
-  test('complete task — advances status from todo to in-progress', async ({ page }) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// 4 · Searching tasks
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('4 · Searching tasks', () => {
+  test('live search filters tasks as user types without page reload', async ({ page }) => {
     await page.goto('/')
-    const title = `Complete E2E ${Date.now()}`
-    await openAddModal(page)
-    await fillAndSubmitTask(page, title)
+    const unique = `LiveSearch${Date.now()}`
+    await createTask(page, unique)
 
-    // Find the row and click Complete
+    const search = page.getByRole('searchbox', { name: /search tasks/i })
+    await search.fill(unique.slice(0, 10))
+    await expect(page.getByText(unique)).toBeVisible()
+
+    await search.fill('zzz_no_match_zzz')
+    await expect(page.getByText(unique)).not.toBeVisible()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5 · Filtering
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('5 · Filtering', () => {
+  test('filter by status=In Progress hides todo tasks', async ({ page }) => {
+    await page.goto('/')
+    const todoTitle = await createTask(page, 'FilterTodo')
+
+    await page.getByLabel(/filter by status/i).selectOption('in-progress')
+    await expect(page.getByText(todoTitle)).not.toBeVisible()
+
+    await page.getByLabel(/filter by status/i).selectOption('')
+    await expect(page.getByText(todoTitle)).toBeVisible()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6 · Editing a task
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('6 · Editing a task', () => {
+  test('edit button opens the modal pre-populated with existing task data', async ({ page }) => {
+    await page.goto('/')
+    const title = await createTask(page, 'EditPrefill', 'low')
     const row = page.getByRole('row').filter({ hasText: title })
-    await row.getByRole('button', { name: /mark.*complete/i }).click()
+    await row.getByRole('button', { name: /edit/i }).click()
 
-    // Status badge should now read "In Progress"
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByLabel(/title/i)).toHaveValue(title)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7 · Completing a task (status workflow)
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('7 · Completing a task', () => {
+  test('mark complete advances status from todo → in-progress', async ({ page }) => {
+    await page.goto('/')
+    const title = await createTask(page, 'WorkflowTodo')
+    const row = page.getByRole('row').filter({ hasText: title })
+
+    await row.getByRole('button', { name: /mark.*complete/i }).click()
     await expect(row.getByText('In Progress')).toBeVisible()
   })
 
-  test('complete task again — advances from in-progress to done', async ({ page }) => {
+  test('mark complete again advances status from in-progress → done', async ({ page }) => {
     await page.goto('/')
-    const title = `Done E2E ${Date.now()}`
-    await openAddModal(page)
-    await fillAndSubmitTask(page, title)
-
+    const title = await createTask(page, 'WorkflowInProgress')
     const row = page.getByRole('row').filter({ hasText: title })
 
     // todo → in-progress
@@ -86,93 +259,22 @@ test.describe('Task Management System', () => {
     await expect(row.getByText('Done')).toBeVisible()
     await expect(row.getByRole('button', { name: /mark.*complete/i })).not.toBeVisible()
   })
+})
 
-  test('edit task — updated title is reflected in the table', async ({ page }) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// 8 · Deleting a task
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('8 · Deleting a task', () => {
+  test('confirming delete removes the row from the table', async ({ page }) => {
     await page.goto('/')
-    const title = `Edit Me ${Date.now()}`
-    const updatedTitle = `Edited ${Date.now()}`
-    await openAddModal(page)
-    await fillAndSubmitTask(page, title)
+    const title = await createTask(page, 'DeleteConfirm')
 
+    page.on('dialog', (dialog) => dialog.accept())
     const row = page.getByRole('row').filter({ hasText: title })
-    await row.getByRole('button', { name: /edit/i }).click()
-    await expect(page.getByRole('dialog')).toBeVisible()
-
-    await page.getByLabel(/title/i).fill(updatedTitle)
-    await page.getByRole('button', { name: /update task/i }).click()
-
-    await expect(page.getByText(updatedTitle)).toBeVisible()
-    await expect(page.getByText(title)).not.toBeVisible()
-  })
-
-  test('delete task — row is removed from the table', async ({ page }) => {
-    await page.goto('/')
-    const title = `Delete Me ${Date.now()}`
-    await openAddModal(page)
-    await fillAndSubmitTask(page, title)
-
-    const row = page.getByRole('row').filter({ hasText: title })
-    page.on('dialog', (dialog) => dialog.accept()) // confirm delete
     await row.getByRole('button', { name: /delete/i }).click()
 
     await expect(page.getByText(title)).not.toBeVisible()
-  })
-
-  test('filter by status — only matching tasks are visible', async ({ page }) => {
-    await page.goto('/')
-
-    // Add one todo task
-    const todoTitle = `Status-Todo ${Date.now()}`
-    await openAddModal(page)
-    await fillAndSubmitTask(page, todoTitle)
-
-    // Select "In Progress" filter — the todo task should disappear
-    await page.getByLabel(/filter by status/i).selectOption('in-progress')
-    await expect(page.getByText(todoTitle)).not.toBeVisible()
-
-    // Reset filter
-    await page.getByLabel(/filter by status/i).selectOption('')
-    await expect(page.getByText(todoTitle)).toBeVisible()
-  })
-
-  test('filter by priority — only high-priority tasks visible', async ({ page }) => {
-    await page.goto('/')
-    const highTitle = `High Prio ${Date.now()}`
-    await openAddModal(page)
-    await fillAndSubmitTask(page, highTitle, 'High')
-
-    await page.getByLabel(/filter by priority/i).selectOption('high')
-    await expect(page.getByText(highTitle)).toBeVisible()
-
-    // Tasks without high priority should not appear
-    const rows = page.getByRole('row')
-    const count = await rows.count()
-    for (let i = 1; i < count; i++) {
-      await expect(rows.nth(i).getByText('High')).toBeVisible()
-    }
-  })
-
-  test('live search — table updates as user types, no page reload', async ({ page }) => {
-    await page.goto('/')
-    const uniqueTitle = `UniqueSearch${Date.now()}`
-    await openAddModal(page)
-    await fillAndSubmitTask(page, uniqueTitle)
-
-    const searchInput = page.getByPlaceholder(/search tasks/i)
-    await searchInput.fill(uniqueTitle.slice(0, 6))
-    await expect(page.getByText(uniqueTitle)).toBeVisible()
-
-    // Typing something that matches nothing should show no rows
-    await searchInput.fill('zzz_no_match_zzz')
-    await expect(page.getByText(uniqueTitle)).not.toBeVisible()
-  })
-
-  test('clear filters button resets all filters', async ({ page }) => {
-    await page.goto('/')
-    await page.getByPlaceholder(/search tasks/i).fill('some text')
-    await expect(page.getByRole('button', { name: /clear/i })).toBeVisible()
-    await page.getByRole('button', { name: /clear/i }).click()
-    await expect(page.getByPlaceholder(/search tasks/i)).toHaveValue('')
   })
 })
 

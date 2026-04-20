@@ -287,3 +287,6 @@ Review apps/backend/src/routes.py according to .github/copilot-instructions.md a
 - `live search — table updates as user types, no page reload`
 - `clear filters button resets all filters`
 
+Playwright
+
+![img_2.png](img_2.png)

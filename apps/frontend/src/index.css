@@ -1,0 +1,47 @@
+/* Global styles — reset + design tokens */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #f8f9fa;
+  --color-surface: #ffffff;
+  --color-border: #dee2e6;
+  --color-text: #212529;
+  --color-muted: #6c757d;
+
+  /* Priority colours */
+  --color-priority-high: #dc3545;
+  --color-priority-medium: #fd7e14;
+  --color-priority-low: #28a745;
+
+  /* Status colours */
+  --color-status-todo: #6c757d;
+  --color-status-in-progress: #0d6efd;
+  --color-status-done: #28a745;
+
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+}
+
+.app-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-main {
+  margin-top: 1.5rem;
+}
